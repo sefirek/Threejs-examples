@@ -1,0 +1,27 @@
+{
+  "name": "Threejs-examples",
+  "version": "1.0.0",
+  "description": "Przykłady użycia threejs",
+  "main": "src/server/index.js",
+  "scripts": {
+    "start": "node .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sefirek/Threejs-examples.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sefirek/Threejs-examples/issues"
+  },
+  "homepage": "https://github.com/sefirek/Threejs-examples#readme",
+  "dependencies": {
+    "express": "^4.17.1",
+    "socket.io": "^4.0.0",
+    "socket.io-client": "^4.0.0",
+    "three-js": "^79.0.0"
+  }
+}
