@@ -1,0 +1,30 @@
+#hexagonContainer {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.table {
+  display: inline-table;
+  width: auto;
+  margin-bottom: 0 !important;
+}
+
+.table td {
+  padding: 0 0.75rem !important;
+  height: auto;
+  vertical-align: middle !important;
+}
+
+.table td:first-child {
+  font-weight: bold;
+}
+
+.table input {
+  height: 15px;
+}
+
+.group-button {
+  display: flex;
+  column-gap: 10px;
+  padding: 5px 0.75rem 10px;
+}
