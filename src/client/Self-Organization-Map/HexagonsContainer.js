@@ -7,15 +7,19 @@ export default class HexagonsContainer extends Array {
   constructor(...args) {
     super(...args);
 
-    this.learningRate = new EventEmitter().setValue(0.1);
-    this.lastEpoch = new EventEmitter().setValue(100);
-    this.currentEpoch = new EventEmitter().setValue(0);
-    this.maxNeighborhood = new EventEmitter().setValue(1);
-    this.neighborhoodSize = new EventEmitter().setValue(1);
-    this.currentLearningRate = new EventEmitter().setValue(this.learningRate.getValue());
-    this.run = new EventEmitter().setValue(0);
-    this.rowCount = new EventEmitter().setValue(8);
-    this.columnCount = new EventEmitter().setValue(8);
+    this.learningRate = new EventEmitter(this).setValue(0.1);
+    this.lastEpoch = new EventEmitter(this).setValue(100);
+    this.currentEpoch = new EventEmitter(this).setValue(0);
+    this.maxNeighborhood = new EventEmitter(this).setValue(1);
+    this.neighborhoodSize = new EventEmitter(this).setValue(1);
+    this.currentLearningRate = new EventEmitter(this).setValue(this.learningRate.getValue());
+    this.run = new EventEmitter(this);
+    this.rowCount = new EventEmitter(this).setValue(8);
+    this.columnCount = new EventEmitter(this).setValue(8);
+    this.optimalWeights = new EventEmitter(this);
+    this.optimalError = new EventEmitter(this).setValue(0);
+    this.optimalData = new EventEmitter().setValue({ weights: null, error: null });
+    this.currentError = new EventEmitter(this).setValue(0);
 
     /**
      * @type {HTMLInputElement}
@@ -53,9 +57,14 @@ export default class HexagonsContainer extends Array {
     };
 
     this.setWeights = (weights = []) => {
-      this.forEach((hexagon, id) => {
-        hexagon.weights = [...weights[id]];
-      });
+      try {
+        this.forEach((hexagon, id) => {
+          hexagon.weights = [...weights[id]];
+        });
+      } catch (e) {
+        console.error({ hc: this, weights });
+        throw new Error('The sizes of the arrays are not the same');
+      }
     };
     /**
      *
@@ -76,12 +85,16 @@ export default class HexagonsContainer extends Array {
     };
     this.createDOM = () => {
       this.nodeContainer = document.getElementById('hexagonContainer');
-      const table = getAndAddTable(this.nodeContainer);
+      const rowInterfaceContainer = ce('div');
+      rowInterfaceContainer.className = 'row-interface-container';
+
+      const table = getAndAddTable(rowInterfaceContainer);
       table.append(
         createRow('Learning rate', this.learningRate),
         createRow('Current learning rate', this.currentLearningRate),
         createRow('Epoch', this.currentEpoch),
         createRow('Max epoch', this.lastEpoch),
+        createRow('Max Neighborhood distance', this.maxNeighborhood),
         createRow('Neighborhood distance', this.neighborhoodSize),
         createRow('Columns', this.columnCount),
         createRow('Rows', this.rowCount),
@@ -90,15 +103,14 @@ export default class HexagonsContainer extends Array {
       nodeGroupButton.className = 'group-button';
       getAndAddButton(nodeGroupButton, 'Start', (event) => {
         event.preventDefault();
-        if (!this.run.getValue()) this.run.setValue(1);
+        this.run.setValue(1);
       });
       getAndAddButton(nodeGroupButton, 'Stop', (event) => {
         event.preventDefault();
-        if (this.run.getValue()) this.run.setValue(0);
+        this.run.setValue(0);
       });
       getAndAddButton(nodeGroupButton, 'Restart', (event) => {
         event.preventDefault();
-        this.run.setValue(0);
         this.learningRate.setValue(0.1);
         this.lastEpoch.setValue(100);
         this.currentEpoch.setValue(0);
@@ -106,12 +118,67 @@ export default class HexagonsContainer extends Array {
         this.neighborhoodSize.setValue(1);
         this.currentLearningRate.setValue(this.learningRate.getValue());
         this.nextEpoch();
+        this.run.setValue(0);
       });
       getAndAddButton(nodeGroupButton, 'Play', (event) => {
         event.preventDefault();
         this.run.setValue(2);
       });
-      this.nodeContainer.append(nodeGroupButton);
+      rowInterfaceContainer.append(nodeGroupButton);
+      this.nodeContainer.append(rowInterfaceContainer);
+
+      const jsonContainer = ce('div');
+      jsonContainer.className = 'json-container';
+      const textarea = ce('textarea');
+      this.optimalWeights.addEventListener((current) => {
+        this.optimalData.setValue(Object.assign(this.optimalData.getValue(), { weights: current }));
+        textarea.value = JSON.stringify(this.optimalData.getValue(), null, 2);
+      });
+      this.optimalError.addEventListener((current) => {
+        this.optimalData.setValue(Object.assign(this.optimalData.getValue(), { error: current }));
+        textarea.value = JSON.stringify(this.optimalData.getValue(), null, 2);
+      });
+
+      jsonContainer.append(textarea);
+
+      const groupButton = ce('div');
+      groupButton.className = 'group-button';
+
+      getAndAddButton(groupButton, 'Set', (event) => {
+        event.preventDefault();
+        try {
+          if (!textarea.value) {
+            console.error({ textarea });
+            throw new Error('InnerHTML is empty');
+          }
+          const json = JSON.parse(textarea.value);
+          this.optimalData.setValue(json);
+        } catch (e) {
+          console.error({ innerHTML: textarea.innerHTML });
+          throw e;
+        }
+      });
+      this.optimalData.addEventListener((current) => {
+        this.optimalWeights.setValue(current.weights);
+        this.optimalError.setValue(current.error);
+      });
+
+      getAndAddButton(groupButton, 'Copy', (event) => {
+        event.preventDefault();
+
+        const rangePre = new Range();
+        rangePre.setStart(textarea, 0);
+        rangePre.setEnd(textarea, 1);
+
+        const selection = document.getSelection();
+        selection.empty();
+        selection.addRange(rangePre);
+        document.execCommand('copy');
+        selection.removeRange(rangePre);
+      });
+
+      jsonContainer.append(groupButton);
+      this.nodeContainer.append(jsonContainer);
 
       // this.learningRateNode = getAndAddInput(nodeContainer, 'learningRate', 'Learning rate', 0, 1);
       // this.learningRateNode.value = this.learningRate;
@@ -196,7 +263,6 @@ function createRow(name, eventEmitter) {
 function getAndAddTable(container) {
   const table = ce('table');
   table.className = 'table d-inline-table';
-  table.style.width = 'auto';
   container.append(table);
   return table;
 }
@@ -213,15 +279,29 @@ function getAndAddButton(container, name, listener) {
   return button;
 }
 
-function EventEmitter() {
-  let value = 0;
+function EventEmitter(parent) {
+  if (parent) {
+    const parentHandler = parent;
+    const keys = Object.keys(parentHandler);
+    this.name = '';
+    for (let i = 0; i < keys; i += 1) {
+      if (parentHandler[keys[i]] === this) {
+        this.name = keys[i];
+        break;
+      }
+    }
+  }
+  let value = null;
   const listeners = [];
   this.getValue = () => value;
   this.setValue = (val) => {
-    value = Number.parseFloat(val);
+    let curr = Number.parseFloat(val);
+    if (Number.isNaN(curr) || Array.isArray(val)) curr = val;
+    if (curr === value) return this;
     listeners.forEach((fn) => {
-      fn(val);
+      fn(curr, value);
     });
+    value = curr;
     return this;
   };
   this.addEventListener = (listener) => {

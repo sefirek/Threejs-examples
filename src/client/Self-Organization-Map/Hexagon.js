@@ -47,7 +47,10 @@ export default function Hexagon(hexagonMesh, hexagonsContainer, inputSize = 0) {
       sum += (weight - input[id]) ** 2;
     });
     this.value = Math.sqrt(sum);
-    if (Number.isNaN(this.value)) throw new Error(`Value not a number ${JSON.stringify(this.weights, null, 2)} ${JSON.stringify(input, null, 2)}`);
+    if (Number.isNaN(this.value)) {
+      console.error({ input, weights: this.weights });
+      throw new Error(`Value not a number ${JSON.stringify(this.weights, null, 2)} ${JSON.stringify(input, null, 2)}`);
+    }
     return this;
   };
   this.train = (input = []) => {
@@ -68,7 +71,7 @@ export default function Hexagon(hexagonMesh, hexagonsContainer, inputSize = 0) {
       console.log(this);
       throw new Error(JSON.stringify({ badValue: this.value }, null, 2));
     }
-    if (Math.abs(this.value) > 20) throw new Error(JSON.stringify({ value: this.value }, null, 2));
+    if (Math.abs(this.value) > 200) throw new Error(JSON.stringify({ value: this.value }, null, 2));
     mesh.material.color.setHSL(Math.max(0, Math.min(1, this.value)) * 0.7, 0.75, 0.5);
   };
 }

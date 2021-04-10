@@ -1,6 +1,9 @@
 #hexagonContainer {
-  display: inline-block;
-  vertical-align: top;
+  display: inline-flex;
+}
+
+#hexagonContainer > * + * {
+  margin-left: 8px;
 }
 
 .table {
@@ -19,12 +22,28 @@
   font-weight: bold;
 }
 
-.table input {
-  height: 15px;
-}
-
 .group-button {
   display: flex;
   column-gap: 10px;
   padding: 5px 0.75rem 10px;
+}
+
+.json-container {
+  position: relative;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.json-container > textarea {
+  font-family: monospace;
+  font-size: 80%;
+  width: 300px;
+  height: 100%;
+  resize: none;
+}
+
+.json-container > .group-button {
+  padding-left: 0;
+  padding-right: 0;
 }

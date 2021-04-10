@@ -42,6 +42,19 @@ function createSquare() {
  */
 const hexagonsContainer = new HexagonsContainer();
 hexagonsContainer.createDOM();
+hexagonsContainer.optimalWeights.addEventListener((curr, prev) => {
+  if (Number.isFinite(curr)) {
+    console.error('bad weights', hexagonsContainer.getWeights());
+    console.error('optWeiBad', { curr, prev });
+    throw new Error('not object');
+  }
+});
+hexagonsContainer.optimalError.addEventListener((current, prev) => {
+  if (current === null) {
+    console.error({ current, prev });
+    throw new Error('Value is null');
+  }
+});
 
 
 // const containerStyle = window.getComputedStyle(hexagonsContainer.nodeContainer);
@@ -49,15 +62,17 @@ hexagonsContainer.createDOM();
 // const containerWidth = Number.parseInt(containerStyle.getPropertyValue('width'), 10);
 
 document.onreadystatechange = () => {
-  if (document.readyState === 'complete') {
-    const canvasClientRect = renderer.domElement.getBoundingClientRect();
-    const { y: clientY } = canvasClientRect;
-    const containerWidth = hexagonsContainer.nodeContainer.clientWidth;
-    const ratio = containerWidth / (window.innerHeight - clientY);
-    renderer.setSize(containerWidth, window.innerHeight - clientY);
-    camera.aspect = ratio;
-    camera.updateProjectionMatrix();
+  if (document.readyState !== 'complete') {
+    return;
   }
+
+  const canvasClientRect = renderer.domElement.getBoundingClientRect();
+  const { y: clientY } = canvasClientRect;
+  const containerWidth = hexagonsContainer.nodeContainer.firstElementChild.clientWidth;
+  const ratio = containerWidth / (window.innerHeight - clientY);
+  renderer.setSize(containerWidth, window.innerHeight - clientY);
+  camera.aspect = ratio;
+  camera.updateProjectionMatrix();
 };
 
 const dataSize = 8;
@@ -119,14 +134,10 @@ camera.position.z = 1;
  */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.update();
-const one = new Array(dataSize).fill(1);
-if (window.weights) {
-  hexagonsContainer.setWeights(window.weights);
-}
+
 hexagonsContainer.nextEpoch();
 getData(dataSize).then((data) => {
   let index = 0;
-  const nextRadius = 1;
   let epoka = 0;
   let randomData = createRandomData();
   function createRandomData() {
@@ -139,8 +150,15 @@ getData(dataSize).then((data) => {
     }
     return random;
   }
-  hexagonsContainer.run.addEventListener((run) => {
-    if (run) animate();
+  hexagonsContainer.run.addEventListener((curr, prev) => {
+    if (curr === prev) return;
+    if (curr > 0) {
+      const optimalWeights = hexagonsContainer.optimalWeights.getValue();
+      if (Number.isNaN(optimalWeights)) {
+        hexagonsContainer.setWeights(optimalWeights);
+      }
+    }
+    requestAnimationFrame(animate);
   });
   function animate() {
     let winner = null;
@@ -156,7 +174,6 @@ getData(dataSize).then((data) => {
         hexagon.updateColor();
       });
 
-      console.log({ index });
       renderer.render(scene, camera);
       index += 1;
       if (index === data.length) {
@@ -174,20 +191,16 @@ getData(dataSize).then((data) => {
           randomData = createRandomData();
           hexagonsContainer.nextEpoch();
           const currentError = hexagonsContainer.calculateError(data);
-          if (!window.error) {
-            window.error = currentError;
-            window.weights = hexagonsContainer.getWeights();
-            const { error, weights } = window;
-            console.log({ error, weights });
+          hexagonsContainer.currentError.setValue(currentError);
+          if (!hexagonsContainer.optimalError.getValue()) {
+            hexagonsContainer.optimalError.setValue(currentError);
+            hexagonsContainer.optimalWeights.setValue({ weights: hexagonsContainer.getWeights() });
           }
-          if (window.error < currentError) {
-            hexagonsContainer.setWeights(window.weights);
-          // console.log('change');
+          if (hexagonsContainer.optimalError.getValue() < currentError) {
+            hexagonsContainer.setWeights(hexagonsContainer.optimalWeights.getValue());
           } else {
-            window.error = currentError;
-            window.weights = hexagonsContainer.getWeights();
-            const { error, weights } = window;
-            console.log({ error, weights });
+            hexagonsContainer.optimalError.setValue(currentError);
+            hexagonsContainer.optimalWeights.setValue(hexagonsContainer.getWeights());
           }
           controls.update();
           renderer.render(scene, camera);
@@ -205,7 +218,7 @@ getData(dataSize).then((data) => {
     renderer.render(scene, camera);
 
     if (hexagonsContainer.currentEpoch.getValue() < hexagonsContainer.lastEpoch.getValue()
-    && hexagonsContainer.run.getValue())requestAnimationFrame(animate);
+    && hexagonsContainer.run.getValue() > 0)requestAnimationFrame(animate);
     else hexagonsContainer.run.setValue(0);
     // else {
     //   index = 0;
