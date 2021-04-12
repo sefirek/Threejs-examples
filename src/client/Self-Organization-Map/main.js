@@ -44,22 +44,15 @@ const hexagonsContainer = new HexagonsContainer();
 hexagonsContainer.createDOM();
 hexagonsContainer.optimalWeights.addEventListener((curr, prev) => {
   if (Number.isFinite(curr)) {
-    console.error('bad weights', hexagonsContainer.getWeights());
-    console.error('optWeiBad', { curr, prev });
     throw new Error('not object');
   }
 });
 hexagonsContainer.optimalError.addEventListener((current, prev) => {
   if (current === null) {
-    console.error({ current, prev });
     throw new Error('Value is null');
   }
 });
 
-
-// const containerStyle = window.getComputedStyle(hexagonsContainer.nodeContainer);
-// console.log({ containerStyle });
-// const containerWidth = Number.parseInt(containerStyle.getPropertyValue('width'), 10);
 
 document.onreadystatechange = () => {
   if (document.readyState !== 'complete') {
@@ -77,10 +70,10 @@ document.onreadystatechange = () => {
 
 const dataSize = 8;
 
-createHexagons();
 function createHexagons() {
   hexagonsContainer.forEach(hexagon => scene.remove(hexagon.getMesh()));
   hexagonsContainer.splice(0);
+
   const hexagonSize = Math.min(
     1 / (1.5 * (hexagonsContainer.rowCount.getValue()) + 0.5),
     1 / (((hexagonsContainer.columnCount.getValue() > 1 ? 1 : 0) + 2 + 2 * (hexagonsContainer.columnCount.getValue() - 1)) * Math.sqrt(3) / 2),
@@ -114,9 +107,6 @@ function createHexagons() {
   hexagonsContainer.forEach(hexagon => hexagon.calculateNeighboursRadius());
 }
 
-hexagonsContainer.columnCount.addEventListener(createHexagons);
-hexagonsContainer.rowCount.addEventListener(createHexagons);
-
 function getX(i, j) {
   return 1 + 1.5 * i;
 }
@@ -125,8 +115,17 @@ function getY(i, j) {
   return ((i % 2) + 1 + 2 * j) * Math.sqrt(3) / 2;
 }
 
+const onChangeSize = () => {
+  if (hexagonsContainer.run.getValue()) hexagonsContainer.run.setValue(0);
+  hexagonsContainer.optimalWeights.setValue([]);
+  // throw new Error('xxx');
+  createHexagons();
+  setTimeout(() => {
 
-console.log({ cubes: hexagonsContainer.length });
+  }, 1);
+};
+hexagonsContainer.columnCount.addEventListener(onChangeSize);
+hexagonsContainer.rowCount.addEventListener(onChangeSize);
 
 camera.position.z = 1;
 /**
@@ -153,16 +152,23 @@ getData(dataSize).then((data) => {
   hexagonsContainer.run.addEventListener((curr, prev) => {
     if (curr === prev) return;
     if (curr > 0) {
-      const optimalWeights = hexagonsContainer.optimalWeights.getValue();
-      if (Number.isNaN(optimalWeights)) {
-        hexagonsContainer.setWeights(optimalWeights);
+      const weights = hexagonsContainer.getWeights();
+      if (!weights.length) createHexagons();
+      const isOptimal = hexagonsContainer.isOptimalWeightsValidSize();
+      if (!isOptimal) {
+        hexagonsContainer.optimalWeights.setValue(hexagonsContainer.getWeights());
+        hexagonsContainer.optimalError.setValue(1000000);
       }
+      requestAnimationFrame(animate);
     }
-    requestAnimationFrame(animate);
   });
   function animate() {
+    const isOptimal = hexagonsContainer.isOptimalWeightsValidSize();
+    if (!isOptimal) {
+      hexagonsContainer.optimalWeights.setValue(hexagonsContainer.getWeights());
+      hexagonsContainer.optimalError.setValue(1000000);
+    }
     let winner = null;
-
     // winner = hexagonsContainer.getWinner(one);
 
     // calculateHeatMap(new Array(dataSize).fill(1));
@@ -194,13 +200,14 @@ getData(dataSize).then((data) => {
           hexagonsContainer.currentError.setValue(currentError);
           if (!hexagonsContainer.optimalError.getValue()) {
             hexagonsContainer.optimalError.setValue(currentError);
-            hexagonsContainer.optimalWeights.setValue({ weights: hexagonsContainer.getWeights() });
+            hexagonsContainer.optimalWeights.setValue(hexagonsContainer.getWeights());
           }
           if (hexagonsContainer.optimalError.getValue() < currentError) {
             hexagonsContainer.setWeights(hexagonsContainer.optimalWeights.getValue());
           } else {
             hexagonsContainer.optimalError.setValue(currentError);
             hexagonsContainer.optimalWeights.setValue(hexagonsContainer.getWeights());
+            if (!hexagonsContainer.isOptimalWeightsValidSize()) throw new Error('different weights sizes');
           }
           controls.update();
           renderer.render(scene, camera);

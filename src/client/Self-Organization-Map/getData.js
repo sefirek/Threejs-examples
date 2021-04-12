@@ -9,14 +9,16 @@ export default async function getData(inputSize) {
   });
   let min = Number.MAX_VALUE;
   let max = Number.MIN_VALUE;
-  for (let i = inputSize; i < ohlcList.length; i += 1) {
+  for (let i = inputSize + 1; i < ohlcList.length; i += 1) {
     const data = [];
+    const prevOHLC = ohlcList[i - inputSize];
     for (let j = inputSize - 1; j >= 0; j -= 1) {
       const { close } = ohlcList[i - j];
-      data.push(close);
+      const phase = Math.tan((close / prevOHLC.close) / (i - j));
+      data.push(phase);
       if (datas.length < 10000) {
-        if (close > max) max = close;
-        if (close < min) min = close;
+        if (phase > max) max = phase;
+        if (phase < min) min = phase;
       }
     }
     datas.push(data);

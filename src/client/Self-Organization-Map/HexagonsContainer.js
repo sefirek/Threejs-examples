@@ -18,7 +18,7 @@ export default class HexagonsContainer extends Array {
     this.columnCount = new EventEmitter(this).setValue(8);
     this.optimalWeights = new EventEmitter(this);
     this.optimalError = new EventEmitter(this).setValue(0);
-    this.optimalData = new EventEmitter().setValue({ weights: null, error: null });
+    this.optimalData = new EventEmitter().setValue({ weights: [], error: null });
     this.currentError = new EventEmitter(this).setValue(0);
 
     /**
@@ -53,6 +53,7 @@ export default class HexagonsContainer extends Array {
       this.forEach((hexagon) => {
         weights.push([...hexagon.weights]);
       });
+      // if (weights.length === 0) throw new Error('Weights size 0');
       return weights;
     };
 
@@ -130,13 +131,11 @@ export default class HexagonsContainer extends Array {
       const jsonContainer = ce('div');
       jsonContainer.className = 'json-container';
       const textarea = ce('textarea');
-      this.optimalWeights.addEventListener((current) => {
-        this.optimalData.setValue(Object.assign(this.optimalData.getValue(), { weights: current }));
-        textarea.value = JSON.stringify(this.optimalData.getValue(), null, 2);
+      this.optimalWeights.addEventListener((weights) => {
+        this.optimalData.setValue(Object.assign(this.optimalData.getValue(), { weights }));
       });
-      this.optimalError.addEventListener((current) => {
-        this.optimalData.setValue(Object.assign(this.optimalData.getValue(), { error: current }));
-        textarea.value = JSON.stringify(this.optimalData.getValue(), null, 2);
+      this.optimalError.addEventListener((error) => {
+        this.optimalData.setValue(Object.assign(this.optimalData.getValue(), { error }));
       });
 
       jsonContainer.append(textarea);
@@ -146,21 +145,14 @@ export default class HexagonsContainer extends Array {
 
       getAndAddButton(groupButton, 'Set', (event) => {
         event.preventDefault();
-        try {
-          if (!textarea.value) {
-            console.error({ textarea });
-            throw new Error('InnerHTML is empty');
-          }
-          const json = JSON.parse(textarea.value);
-          this.optimalData.setValue(json);
-        } catch (e) {
-          console.error({ innerHTML: textarea.innerHTML });
-          throw e;
+        if (!textarea.value) {
+          throw new Error('InnerHTML is empty');
         }
+        const json = JSON.parse(textarea.value);
+        this.optimalData.setValue(json);
       });
       this.optimalData.addEventListener((current) => {
-        this.optimalWeights.setValue(current.weights);
-        this.optimalError.setValue(current.error);
+        textarea.value = JSON.stringify(current, null, 2);
       });
 
       getAndAddButton(groupButton, 'Copy', (event) => {
@@ -179,20 +171,11 @@ export default class HexagonsContainer extends Array {
 
       jsonContainer.append(groupButton);
       this.nodeContainer.append(jsonContainer);
-
-      // this.learningRateNode = getAndAddInput(nodeContainer, 'learningRate', 'Learning rate', 0, 1);
-      // this.learningRateNode.value = this.learningRate;
-      // this.learningRateNode.addEventListener('change', () => {
-      //   this.learningRate.setValue(this.learningRateNode.value);
-      // });
-      // this.currentEpochNode = getAndAddInput(nodeContainer, 'currentEpoch', 'Epoka', 1, this.lastEpoch);
-      // this.currentEpochNode.value = this.currentEpoch;
-      // this.neighborhoodSizeNode = getAndAddInput(nodeContainer, 'neighborhoodSize', 'Sąsiedztwo', 1, this.neighborhoodSize);
-      // this.neighborhoodSizeNode.addEventListener('change', () => {
-      //   this.maxNeighborhood.setValue(this.neighborhoodSizeNode.value);
-      // });
-      // this.currentEpochNode.value = this.currentEpoch;
     };
+    Object.keys(this).forEach((key) => {
+      const obj = this[key];
+      if (obj instanceof EventEmitter) obj.name = key;
+    });
   }
 
 
@@ -216,25 +199,22 @@ export default class HexagonsContainer extends Array {
   getHexagon(id) {
     return this[id];
   }
+
+  isOptimalWeightsValidSize() {
+    const weights = this.getWeights();
+    const h = weights.length;
+    const w = weights[0].length;
+    const optData = this.optimalData.getValue();
+    if (!(optData && optData.weights)) return false;
+    const oH = optData.weights.length;
+    const oW = oH ? optData.weights[0].length : 0;
+    if (h !== oH || w !== oW) return false;
+    return true;
+  }
 }
 
 function ce(tagName) {
   return document.createElement(tagName);
-}
-
-function getAndAddInput(container, name, label, min, max) {
-  const labelElement = document.createElement('label');
-  labelElement.setAttribute('for', name);
-  labelElement.innerHTML = label;
-  container.append(labelElement);
-  const input = document.createElement('input');
-  input.setAttribute('type', 'number');
-  input.setAttribute('id', name);
-  input.setAttribute('name', name);
-  if (!Number.isNaN(min)) { input.setAttribute('min', min); }
-  if (!Number.isNaN(max)) { input.setAttribute('min', max); }
-  container.append(input);
-  return input;
 }
 
 function createRow(name, eventEmitter) {
@@ -279,29 +259,22 @@ function getAndAddButton(container, name, listener) {
   return button;
 }
 
-function EventEmitter(parent) {
-  if (parent) {
-    const parentHandler = parent;
-    const keys = Object.keys(parentHandler);
-    this.name = '';
-    for (let i = 0; i < keys; i += 1) {
-      if (parentHandler[keys[i]] === this) {
-        this.name = keys[i];
-        break;
-      }
-    }
-  }
+function EventEmitter() {
   let value = null;
   const listeners = [];
   this.getValue = () => value;
   this.setValue = (val) => {
     let curr = Number.parseFloat(val);
     if (Number.isNaN(curr) || Array.isArray(val)) curr = val;
-    if (curr === value) return this;
-    listeners.forEach((fn) => {
-      fn(curr, value);
-    });
+    if (curr === value && Array.isArray(curr)) {
+      throw new Error('the same array instance');
+    }
+    if (curr === value && typeof curr !== 'object') return this;
+    const prev = value;
     value = curr;
+    listeners.forEach((fn) => {
+      fn(value, prev);
+    });
     return this;
   };
   this.addEventListener = (listener) => {
